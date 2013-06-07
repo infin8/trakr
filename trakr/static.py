@@ -26,6 +26,7 @@ dashboard = """
     <script type="text/javascript" src="http://cdn.trakr.mobi/scripts/gettheme.js"></script>
     <script type="text/javascript">
         $(document).ready(function () {
+            var theme = 'black';
             //var theme = getDemoTheme();
             var url = "%(url)s";
             // prepare the data
@@ -54,7 +55,7 @@ dashboard = """
             {
                 width: 960,
                 source: dataAdapter,
-                theme: 'black',
+                theme: theme,
                 pageable: true,
                 sortable: true,
                 //columnsresize: true,
@@ -140,11 +141,18 @@ dashboard = """
                     $("#jqxgrid").jqxGrid('setcellvalue', row, "profit", revenue - spend);
                 }
             });
+            $("#refresh").jqxButton({ theme: theme });
+            $("#refresh").click(function () {
+                $("#jqxgrid").jqxGrid('updatebounddata');
+            });
         });
     </script>
 </head>
 <body class='default'>
     <div id='jqxWidget' style="font-size: 13px; font-family: Verdana; float: left;">
+        <div style="margin-bottom: 10px; margin-top: 10px; text-align: right;">
+            <input id="refresh" type="button" value="Refresh" />
+        </div>
         <div id="jqxgrid">
         </div>
      </div>

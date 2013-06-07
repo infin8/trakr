@@ -74,6 +74,15 @@ def rest(user=None, payout=0, cpc=0, *args, **kwargs):
     
     return json.dumps(d.values())
 
+@bottle.route('/pb', method=['GET','POST'])
+def postback():
+    yield None
+    for subid in bottle.request.query.getall('subid'):
+        cid = subid[:24]
+        try:
+            db.clicks.update({'_id':ObjectId(cid)}, {'$set': {'leads': 1}})
+        except: pass
+
 @bottle.route('/js')
 def js():
     bottle.response.content_type = 'application/javascript'

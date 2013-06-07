@@ -7,8 +7,9 @@ http://trakr.mobi
 INSTALLATION
 ============
 you will need python pip
-
->sudo apt-get install python python-pip
+```
+sudo apt-get install python python-pip
+```
 
 install trakr
 ```
@@ -27,12 +28,12 @@ user: trakr
 pass: trakr
 ```
 
-### Tracking
+## Tracking
 
-place the following code on your landing page with lpid being your landing page id
+place the following code on your landing page replace "mangos" with a unique identifier being your landing page id
 ```
 <meta name="lpid" content="mangos" />
-<script language="JavaScript" type="text/javascript" src="http://localhost:8101/js"></script>
+<script language="JavaScript" type="text/javascript" src="http://YOURDOMAINHERE.COM/js"></script>
 ```
 
 NGINX
