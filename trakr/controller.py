@@ -76,9 +76,12 @@ def rest(user=None, payout=0, cpc=0, *args, **kwargs):
 
 @bottle.route('/pb', method=['GET','POST'])
 def postback():
-    yield None
-    for subid in bottle.request.query.getall('subid'):
-        cid = subid[:24]
+    yield ''
+    
+    subid = bottle.request.params.get('subid','')
+    cid = subid[:24]
+    
+    if len(cid) == 24:
         try:
             db.clicks.update({'_id':ObjectId(cid)}, {'$set': {'leads': 1}})
         except: pass
