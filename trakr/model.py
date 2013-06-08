@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
+#db.clicks.create_index('campaign')
 from collections import defaultdict
 from database import db, ObjectId
 from datetime import datetime
 
 def campaign_summary(id=None):
     spec = {'campaign':{'$exists':True}}
-    exclude =  {'_id':False}
+    exclude =  {'_id':False, 'campaign':True, 'leads':True}
     
     if id: spec['id'] = id
     
@@ -15,7 +16,7 @@ def generate_summary(clicks):
     campaigns = defaultdict(lambda: defaultdict(int))
     for click in clicks:
         id = click['campaign']
-        campaign = campaigns.get(id, get_campaign(id))                
+        campaign = campaigns.get(id) or get_campaign(id)
         campaign['clicks'] += 1
         campaign['leads'] += click.get('leads', 0)
         
