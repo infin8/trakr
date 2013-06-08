@@ -1,7 +1,4 @@
-import bottle, static, auth, json
-from database import db, ObjectId
-from datetime import datetime
-from collections import defaultdict
+import bottle, static, auth, json, model
 
 @bottle.route('/lp')
 def lander(*args, **kwargs):
@@ -10,12 +7,12 @@ def lander(*args, **kwargs):
     cid = bottle.request.cookies.cid
     
     if not cid:
-        query = dict(bottle.request.query)
-        query['land_time'] = datetime.utcnow()
-        query['ip'] = get_addr()
-        query['ua'] = bottle.request.environ.get('HTTP_USER_AGENT')
-        
-        cid = str(db.clicks.save(query))
+        cid = model.record_click(
+            dict(bottle.request.params),
+            useragent = bottle.request.environ.get('HTTP_USER_AGENT'),
+            ip = get_addr()
+        )
+
         bottle.response.set_cookie('cid', cid)
 
     return 'var cid="%s";' % cid
@@ -24,23 +21,15 @@ def lander(*args, **kwargs):
 def clickthrough(*args, **kwargs):
     bottle.response.content_type = 'application/javascript'
     
-    cid = bottle.request.query.cid or bottle.request.cookies.cid
+    cid = bottle.request.params.get('cid') or bottle.request.cookies.cid
     
-    url = bottle.request.query.url
-    if bottle.request.query.url.endswith('='): url += cid
+    url = bottle.request.params.get('url')
+    if url.endswith('='): url += cid
     
     yield 'document.location.replace("%s");' % url
     
-    if cid:
-        db.clicks.update(
-            {'_id': ObjectId(cid), 
-            'outbound':{'$exists': False},
-            'click_time':{'$exists': False}}, 
-            {'$set':{
-                'outbound': bottle.request.query.url,
-                'click_time': datetime.utcnow()
-            }},
-        )
+    if cid: model.record_clickthrough(cid, bottle.request.query.url)
+        
 
 @bottle.route('/dashboard', apply=[auth.authenticated])
 def dashboard(user=None, *args, **kwargs):
@@ -62,17 +51,8 @@ def login_post(*args, **kwargs):
 @bottle.route('/rest', apply=[auth.authenticated])
 def rest(user=None, payout=0, cpc=0, *args, **kwargs): 
     bottle.response.content_type = 'application/json'
-    
-    spec = {'campaign':{'$exists':True}}
-    d = defaultdict(lambda: defaultdict(int))
-    
-    for row in db.clicks.find(spec):
-        d[row['campaign']]['id'] = row['campaign']
-        d[row['campaign']]['name'] = row.get('name', '')
-        d[row['campaign']]['clicks'] += 1
-        d[row['campaign']]['leads'] += row.get('leads', 0)
-    
-    return json.dumps(d.values())
+    summary = model.campaign_summary()
+    return json.dumps(summary)
 
 @bottle.route('/pb', method=['GET','POST'])
 def postback():
@@ -81,10 +61,14 @@ def postback():
     subid = bottle.request.params.get('subid','')
     cid = subid[:24]
     
-    if len(cid) == 24:
-        try:
-            db.clicks.update({'_id':ObjectId(cid)}, {'$set': {'leads': 1}})
-        except: pass
+    if len(cid) == 24: model.record_lead(cid)
+
+@bottle.route('/save_campaign', method=['GET','POST'])
+def save_campaign():
+    yield ''
+    
+    model.save_campaign(dict(bottle.request.params))
+
 
 @bottle.route('/js')
 def js():
@@ -102,6 +86,6 @@ def get_addr(*args, **kwargs):
         return addr.split(',')[-1].strip()
 
     return bottle.request.environ.get('REMOTE_ADDR')
-  
+    
 if __name__ == '__main__':
     bottle.run(host='localhost', port=8101, debug=True, reloader=True)
