@@ -51,7 +51,10 @@ def login_post(*args, **kwargs):
 @bottle.route('/rest', apply=[auth.authenticated])
 def rest(user=None, payout=0, cpc=0, *args, **kwargs): 
     bottle.response.content_type = 'application/json'
-    summary = model.campaign_summary()
+    fr = int(bottle.request.params.get('from', 0))
+    to = int(bottle.request.params.get('to', 0))
+    
+    summary = model.campaign_summary(fr=fr, to=to)
     return json.dumps(summary)
 
 @bottle.route('/pb', method=['GET','POST'])

@@ -4,7 +4,7 @@ from collections import defaultdict
 from database import db, ObjectId
 from datetime import datetime
 
-def campaign_summary(id=None):
+def _campaign_summary(id=None):
     spec = {'campaign':{'$exists':True}}
     exclude =  {'_id':False, 'campaign':True, 'leads':True}
     
@@ -39,6 +39,7 @@ def get_campaign(id=''):
         error = 0,
         clicks = 0,
         leads = 0,
+        cpc = 0,
     )
     
     return save_campaign(campaign)
@@ -77,3 +78,59 @@ def record_lead(cid):
         return True
     except:
         return False
+
+def finalize(result, campaign):
+    cpc = float(campaign['cpc'])
+    payout = float(campaign['payout'])
+    error = float(campaign['error'])
+    
+    result['id'] = campaign['id']
+    result['cpc'] = cpc
+    result['payout'] = payout
+    result['error'] = error * 100
+    result['clicks'] *= (1 + error)
+    result['revenue'] = result['leads'] * payout
+    result['epc'] = result['revenue'] / result['clicks']
+    result['spend'] = result['clicks'] * cpc
+    result['profit'] = result['revenue'] - result['spend']
+    result['conversion'] = result['leads'] / result['clicks'] * 100
+    result['roi'] = result['profit'] / result['spend'] \
+        if result['spend'] > 0 else 0
+    
+    return result
+
+def campaign_summary(campaign_id=None, groupby=None, error=0, fr=0, to=0):
+    reduce = """
+        function(obj,result){
+            result.clicks++;
+            if(obj.leads){
+                result.leads += obj.leads;
+            }
+        }
+    """
+    
+    exclude = { 'campaign': 1 }
+    condition = {'click_time': {'$gte': datetime.fromtimestamp(fr), 
+                                '$lte': datetime.fromtimestamp(to)}}
+    
+    if groupby:
+        exclude[groupby] = 1
+    
+    if campaign_id:
+        condition['campaign'] = str(campaign_id)
+
+    results = generate_results(db.clicks.group(exclude, condition=condition,
+                         reduce=reduce, initial={'clicks' : 0,'leads': 0}))
+    
+    return sorted(results, key=lambda x: x['profit'], reverse=True)
+
+def generate_results(clicks):
+    campaigns = {}
+    
+    for click in clicks:
+        id = click['campaign']
+        campaign = campaigns.get(id) or get_campaign(id)
+        
+        yield finalize(click, campaign)
+        
+        campaigns[id] = campaign

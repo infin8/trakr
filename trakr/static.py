@@ -5,8 +5,7 @@ dashboard = """
     <title id='Description'>trakr Dashboard
     </title>
     <link rel="stylesheet" href="http://cdn.trakr.mobi/jqwidgets/styles/jqx.base.css" type="text/css" />
-    <link rel="stylesheet" href="http://cdn.trakr.mobi/jqwidgets/styles/jqx.black.css" type="text/css" />
-    <link rel="stylesheet" href="http://cdn.trakr.mobi/jqwidgets/styles/jqx.shinyblack.css" type="text/css" />
+    <link rel="stylesheet" href="http://cdn.trakr.mobi/jqwidgets/styles/jqx.ui-darkness.css" type="text/css" />
     <script type="text/javascript" src="http://cdn.trakr.mobi/scripts/jquery-1.8.3.min.js"></script>
     <script type="text/javascript" src="http://cdn.trakr.mobi/jqwidgets/jqxcore.js"></script>
     <script type="text/javascript" src="http://cdn.trakr.mobi/jqwidgets/jqxdata.js"></script> 
@@ -24,6 +23,11 @@ dashboard = """
     <script type="text/javascript" src="http://cdn.trakr.mobi/jqwidgets/jqxgrid.selection.js"></script> 
     <script type="text/javascript" src="http://cdn.trakr.mobi/jqwidgets/jqxgrid.edit.js"></script> 
     <script type="text/javascript" src="http://cdn.trakr.mobi/scripts/gettheme.js"></script>
+   
+    <script type="text/javascript" src="http://cdn.trakr.mobi/jqwidgets/jqxdatetimeinput.js"></script>
+    <script type="text/javascript" src="http://cdn.trakr.mobi/jqwidgets/jqxcalendar.js"></script>
+    <script type="text/javascript" src="http://cdn.trakr.mobi/jqwidgets/jqxtooltip.js"></script>
+    <script type="text/javascript" src="http://cdn.trakr.mobi/jqwidgets/globalization/globalize.js"></script>
     <script type="text/javascript">
         function save_campaign(id, name, payout, cpc, error){
             $.post('/save_campaign', {
@@ -119,9 +123,18 @@ dashboard = """
                     }
                 }
         $(document).ready(function () {
-            var theme = 'black';
+            var group = false;
+            var theme = 'ui-darkness';
             //var theme = getDemoTheme();
             var url = "%(url)s";
+            
+            var t = new Date();
+            var from = new Date(t.getFullYear(), t.getMonth(), t.getDate(), 0, 0, 0);
+            var to = new Date(t.getFullYear(), t.getMonth(), t.getDate(), 23, 59, 59);
+            
+            $("#from").jqxDateTimeInput({ width: 250, height: 25, theme: theme, formatString: 'F', value: from })
+            $("#to").jqxDateTimeInput({ width: 250, height: 25, theme: theme, formatString: 'F', value: to })
+            
             // prepare the data
             var source =
             {
@@ -141,9 +154,25 @@ dashboard = """
                     { name: 'profit', type: 'float' }
                 ],
                 id: 'id',
-                url: url
+                url: url,
             };
-            var dataAdapter = new $.jqx.dataAdapter(source);
+            var dataAdapter = new $.jqx.dataAdapter(source, {
+                formatData: function(data){
+                    var f = $("#from").jqxDateTimeInput('getDate');
+                    var t = $("#to").jqxDateTimeInput('getDate');
+
+                    if(!t){
+                        t = to;                    
+                    }
+                    if(!f){
+                        f = from;                    
+                    }
+                    
+                    return {
+                        from: Math.round(f.getTime() / 1000 - f.getTimezoneOffset() * 60), 
+                        to: Math.round(t.getTime() / 1000 - t.getTimezoneOffset() * 60)
+                    };
+                }});
             $("#jqxgrid").jqxGrid(
             {
                 width: 960,
@@ -152,27 +181,8 @@ dashboard = """
                 pageable: true,
                 sortable: true,
                 //columnsresize: true,
-                virtualmode: true,
+                //virtualmode: true,
                 editable: true,
-                rendergridrows: function(params){
-                    var rows = params.data;
-                    var data = {};
-                    for (var i = 0; i < rows.length; i++) {
-                        row = rows[i];
-                        
-                        row.clicks = row.clicks * (1 + row.error);
-                        row.conversion = row.leads / row.clicks;
-                        row.revenue = row.leads * row.payout;
-                        row.spend = row.clicks * row.cpc;
-                        row.profit = row.revenue - row.spend;
-                        row.epc = row.revenue / row.clicks;
-                        row.error = row.error * 100;
-                        
-                        data[i] = row;
-                    }
-                    
-                    return data;
-                },
                 ready: function(){
                     $("#jqxgrid").jqxGrid('setcolumnproperty', 'id', 'editable', false);
                     $("#jqxgrid").jqxGrid('setcolumnproperty', 'conversion', 'editable', false);
@@ -182,7 +192,7 @@ dashboard = """
                     $("#jqxgrid").jqxGrid('setcolumnproperty', 'profit', 'editable', false);
                 },
                 columns: [
-                  { text: 'ID', datafield: 'id', mindwidth: 50, }, /**cellsrenderer: function (row, column, value) {
+                  { text: 'ID', datafield: 'id', mindwidth: 50, columntype: 'button' }, /**cellsrenderer: function (row, column, value) {
                         var button = $("<u/>",{
                             id: 'id',
                             //value: value,
@@ -190,7 +200,13 @@ dashboard = """
                         }).html(value);
                         
                         button.jqxButton({ theme: theme });
-                        button.click(function(){});
+                        button.click(function(){
+                            if(group){
+                                group = false;
+                            }else{
+                                group = true;
+                            }
+                        });
                         
                         return $("<p>").append(button).html();
                     }},**/
@@ -225,6 +241,9 @@ dashboard = """
 <body class='default'>
     <div id='jqxWidget' style="font-size: 13px; font-family: Verdana; float: left;">
         <div style="margin-bottom: 10px; margin-top: 10px; text-align: right;">
+            <div id="from" style="float: left;"></div>
+            <div id="to" style="float: left; margin-left: 10px;"></div>
+            <div style='font-size: 13px; font-family: Verdana; float: left;' id='selection'></div>
             <input id="refresh" type="button" value="Refresh" />
         </div>
         <div id="jqxgrid">
